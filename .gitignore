@@ -1,0 +1,43 @@
+# Nascondi modello, pesi e trasformazioni
+models/
+transformations/
+weights/
+*.pth
+*.pt
+
+# Script sensibili
+evaluate.py
+pneumonia_net.py
+PneumoniaNet.py
+
+# Dataset locali
+data/
+datasets/
+raw_data/
+processed_data/
+
+# Ambiente virtuale
+.venv/
+venv/
+ENV/
+env/
+
+# Cache Python
+__pycache__/
+*.py[cod]
+
+# Streamlit
+.streamlit/
+cache/
+logs/
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*.DS_Store
+
+# File temporanei
+*.log
+*.tmp
