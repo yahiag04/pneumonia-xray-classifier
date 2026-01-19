@@ -1,10 +1,15 @@
 import os
+import io
 import torch
 import torch.nn as nn
 import streamlit as st
 from PIL import Image
 from models.pneumonia_net import PneumoniaNet
 from transformations.pneumonia import test_transforms as pneumonia_tf
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
+from reportlab.lib.utils import ImageReader
+from datetime import datetime
 
 # ========== DEVICE ==========
 if torch.backends.mps.is_available():
@@ -34,7 +39,6 @@ def predict_image(img_pil: Image.Image,
                   pos_label: str,
                   neg_label: str):
 
-    # Se i transform BraTS/X-ray partono da grayscale o RGB gestiscilo qui
     x = transform(img_pil).unsqueeze(0).to(device)
 
     with torch.no_grad():
@@ -45,15 +49,6 @@ def predict_image(img_pil: Image.Image,
     return label, prob
 
 
-
-# pdf
-import io
-from reportlab.lib.pagesizes import A4
-from reportlab.pdfgen import canvas
-from reportlab.lib.utils import ImageReader
-from datetime import datetime
-
-
 #PDF
 def build_pdf_report(img_pil, label, prob, model_info: dict) -> bytes:
 
@@ -61,7 +56,6 @@ def build_pdf_report(img_pil, label, prob, model_info: dict) -> bytes:
     c = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
 
-    # Margini
     margin_x = 50
     y = height - 50
 
@@ -73,8 +67,7 @@ def build_pdf_report(img_pil, label, prob, model_info: dict) -> bytes:
     c.drawString(margin_x, y, f"Generated at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     y -= 30
 
-    # Immagine (thumbnail)
-    # riduco l'immagine
+    #ridimensionamento immagine
     img_copy = img_pil.copy()
     img_copy.thumbnail((300, 300))
     img_reader = ImageReader(img_copy)
@@ -83,7 +76,6 @@ def build_pdf_report(img_pil, label, prob, model_info: dict) -> bytes:
     img_y = y - 300
     c.drawImage(img_reader, img_x, img_y, width=200, height=200, preserveAspectRatio=True, mask='auto')
 
-    # Risultato a destra
     text_x = img_x
     text_y = y
 
@@ -96,7 +88,6 @@ def build_pdf_report(img_pil, label, prob, model_info: dict) -> bytes:
     c.drawString(text_x, text_y, f"P(pneumonia): {prob:.4f}")
     text_y -= 20
 
-    # Confidence level
     if prob >= 0.8:
         conf = "High"
     elif prob >= 0.5:
@@ -131,7 +122,7 @@ def build_pdf_report(img_pil, label, prob, model_info: dict) -> bytes:
     buffer.close()
     return pdf_bytes
 
-# ========== UI ==========
+#Interfaccia utente
 def set_progressbar_color(color):
     st.markdown(
         f"""
@@ -145,9 +136,9 @@ def set_progressbar_color(color):
     )
 
 def main():
-    st.set_page_config(page_title="Medical Imaging Classifier", layout="wide")
+    st.set_page_config(page_title="Pneumonia Detection", layout="wide")
     kaggle_url = "https://www.kaggle.com/datasets/paultimothymooney/chest-xray-pneumonia"
-    st.title("Medical Imaging Classifier")
+    st.title("Pneumonia Detection")
     st.write(
         "- **Pneumonia (X-ray)** usa il modello PneumoniaNet addestrato sul dataset chest_xray di Kaggle.\n"
         f"- Link del dataset: {kaggle_url} \n"
@@ -262,7 +253,7 @@ def main():
         "Architecture": "Custom CNN (4 conv blocks + GAP)",
         "Input": "1x224x224 chest X-ray",
         "Test accuracy": "0.88",
-        "ROC-AUC": "0.95",
+        "ROC-AUC": "0.94",
     }
 
     pdf_bytes = build_pdf_report(img_pil, label, prob, model_info)
