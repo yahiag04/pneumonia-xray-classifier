@@ -43,8 +43,6 @@ It is **not** a medical device and must not be used for diagnostic or clinical d
 - PIL  
 - ReportLab  
 
-The training code, model weights, and internal architecture are intentionally excluded from the repository.
-
 ---
 
 ## Installation
