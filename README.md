@@ -1,6 +1,8 @@
-[README.md](https://github.com/user-attachments/files/24722499/README.md)
+
 
 # Medical Imaging Classifier
+
+<img width="1532" height="846" alt="Screenshot 2025-12-10 alle 23 25 52" src="https://github.com/user-attachments/assets/4a5f9f09-0fc9-43e4-8af2-f70722824a40" />
 
 A Streamlit-based application for classifying chest X‑ray images using a custom convolutional neural network.  
 The system predicts **Normal** vs **Pneumonia**, provides confidence scores, and generates a downloadable PDF report.
