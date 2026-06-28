@@ -7,8 +7,6 @@ The project compares a custom CNN (`PneumoniaNet`) with common convolutional
 architectures and evaluates their behavior across internal and external
 datasets, including zero-shot tests and post-training fine-tuning experiments.
 
-This is a research prototype. It is not a medical device and must not be used
-for diagnosis or treatment decisions.
 
 ## What is included
 
