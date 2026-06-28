@@ -202,6 +202,21 @@ class ThresholdSelectionTest(unittest.TestCase):
 
 
 class ThresholdSelectionSummaryTest(unittest.TestCase):
+    def _valid_cli_args(self, **overrides):
+        args = {
+            "val_manifest": "val.csv",
+            "val_data_root": None,
+            "test_manifest": None,
+            "test_data_root": None,
+            "thresholds": [0.5],
+            "min_sensitivity": None,
+            "metric": "balanced_accuracy",
+            "batch_size": 32,
+            "num_workers": 0,
+        }
+        args.update(overrides)
+        return SimpleNamespace(**args)
+
     def test_summarize_threshold_selection_returns_selected_row_and_rows(self):
         summary = summarize_threshold_selection(
             model_name="efficientnet_b0",
@@ -292,7 +307,7 @@ class ThresholdSelectionSummaryTest(unittest.TestCase):
         with mock.patch(
             "scripts.select_thresholds.build_transforms",
             return_value="transform",
-        ), mock.patch(
+        ) as build_transforms, mock.patch(
             "scripts.select_thresholds.build_internal_splits",
             return_value=splits,
         ) as build_splits:
@@ -306,6 +321,7 @@ class ThresholdSelectionSummaryTest(unittest.TestCase):
             )
 
         self.assertEqual(dataset, "validation-dataset")
+        build_transforms.assert_not_called()
         build_splits.assert_called_once_with(
             "data/chest_xray",
             "resnet18",
@@ -319,7 +335,7 @@ class ThresholdSelectionSummaryTest(unittest.TestCase):
         with mock.patch(
             "scripts.select_thresholds.build_transforms",
             return_value="transform",
-        ), mock.patch(
+        ) as build_transforms, mock.patch(
             "scripts.select_thresholds.build_internal_splits",
             return_value=splits,
         ) as build_splits:
@@ -333,6 +349,7 @@ class ThresholdSelectionSummaryTest(unittest.TestCase):
             )
 
         self.assertEqual(dataset, "test-dataset")
+        build_transforms.assert_not_called()
         build_splits.assert_called_once_with(
             "data/chest_xray",
             "resnet18",
@@ -396,20 +413,42 @@ class ThresholdSelectionSummaryTest(unittest.TestCase):
 
     def test_validate_args_rejects_invalid_cli_inputs_before_inference(self):
         parser = argparse.ArgumentParser()
-        args = SimpleNamespace(
+        args = self._valid_cli_args(
             val_manifest="val.csv",
             val_data_root="data",
-            test_manifest=None,
-            test_data_root=None,
-            thresholds=[0.5],
-            min_sensitivity=None,
-            metric="balanced_accuracy",
         )
 
         with mock.patch("sys.stderr", new=io.StringIO()), self.assertRaises(
             SystemExit
         ):
             validate_args(parser, args)
+
+    def test_validate_args_rejects_threshold_independent_metrics(self):
+        parser = argparse.ArgumentParser()
+
+        for metric in ("roc_auc", "pr_auc"):
+            with self.subTest(metric=metric):
+                args = self._valid_cli_args(metric=metric)
+                with mock.patch("sys.stderr", new=io.StringIO()), self.assertRaises(
+                    SystemExit
+                ):
+                    validate_args(parser, args)
+
+    def test_validate_args_rejects_invalid_loader_settings(self):
+        parser = argparse.ArgumentParser()
+        cases = [
+            {"batch_size": 0},
+            {"batch_size": -1},
+            {"num_workers": -1},
+        ]
+
+        for overrides in cases:
+            with self.subTest(overrides=overrides):
+                args = self._valid_cli_args(**overrides)
+                with mock.patch("sys.stderr", new=io.StringIO()), self.assertRaises(
+                    SystemExit
+                ):
+                    validate_args(parser, args)
 
 
 if __name__ == "__main__":

@@ -32,8 +32,6 @@ ALLOWED_SELECTION_METRICS = {
     "accuracy",
     "balanced_accuracy",
     "f1_pneumonia",
-    "pr_auc",
-    "roc_auc",
     "sensitivity",
     "specificity",
 }
@@ -87,6 +85,10 @@ def validate_args(parser: argparse.ArgumentParser, args: argparse.Namespace) -> 
             "--metric must be one of: "
             + ", ".join(sorted(ALLOWED_SELECTION_METRICS))
         )
+    if args.batch_size <= 0:
+        parser.error("--batch-size must be greater than 0")
+    if args.num_workers < 0:
+        parser.error("--num-workers must be greater than or equal to 0")
 
 
 def build_selection_payload(
@@ -320,8 +322,8 @@ def _build_dataset(
     split: str,
     checkpoint_config: dict | None = None,
 ):
-    transform = build_transforms(model_name, image_size=image_size, train=False)
     if manifest:
+        transform = build_transforms(model_name, image_size=image_size, train=False)
         return ManifestImageDataset(manifest, transform=transform)
     checkpoint_config = checkpoint_config or {}
     splits = build_internal_splits(
