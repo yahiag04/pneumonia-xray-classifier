@@ -16,7 +16,12 @@ sys.path.insert(0, str(ROOT))
 
 from thesis.data import ManifestImageDataset, build_transforms
 from thesis.model_registry import available_models, build_model, configure_trainable_layers
-from thesis.train import choose_device, evaluate_checkpoint, evaluate_loader
+from thesis.train import (
+    choose_device,
+    evaluate_checkpoint,
+    evaluate_loader,
+    keep_frozen_modules_eval,
+)
 
 
 def main() -> int:
@@ -157,15 +162,6 @@ def build_run_dir(output_dir: str | Path, model_name: str, trainable_mode: str) 
     if output_dir.name == run_name:
         return str(output_dir)
     return str(output_dir / run_name)
-
-
-def keep_frozen_modules_eval(model):
-    for module in model.modules():
-        if module is model:
-            continue
-        params = list(module.parameters(recurse=True))
-        if params and not any(parameter.requires_grad for parameter in params):
-            module.eval()
 
 
 def train_epoch(model, loader, criterion, optimizer, device):

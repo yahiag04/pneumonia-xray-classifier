@@ -231,8 +231,18 @@ def collect_predictions(
     }
 
 
+def keep_frozen_modules_eval(model: nn.Module) -> None:
+    for module in model.modules():
+        if module is model:
+            continue
+        params = list(module.parameters(recurse=True))
+        if params and not any(parameter.requires_grad for parameter in params):
+            module.eval()
+
+
 def _train_epoch(model, loader, criterion, optimizer, device):
     model.train()
+    keep_frozen_modules_eval(model)
     total_loss = 0.0
     total = 0
     for x, y in loader:

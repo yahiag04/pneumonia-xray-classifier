@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 
-from thesis.train import collect_predictions
+from thesis.train import collect_predictions, keep_frozen_modules_eval
 
 
 class IdentityLogitModel(nn.Module):
@@ -34,6 +34,25 @@ class PredictionCollectionTest(unittest.TestCase):
         for actual, expected in zip(result["probabilities"], expected_probabilities):
             self.assertAlmostEqual(actual, expected)
         self.assertGreaterEqual(result["elapsed_seconds"], 0.0)
+
+
+class FrozenModuleTrainingTest(unittest.TestCase):
+    def test_keep_frozen_modules_eval_preserves_batchnorm_stats(self):
+        model = nn.Sequential(
+            nn.BatchNorm1d(2),
+            nn.Linear(2, 1),
+        )
+        for parameter in model[0].parameters():
+            parameter.requires_grad = False
+        model.train()
+
+        keep_frozen_modules_eval(model)
+        before = model[0].running_mean.clone()
+        model(torch.ones(4, 2))
+
+        self.assertFalse(model[0].training)
+        self.assertTrue(model[1].training)
+        self.assertTrue(torch.equal(model[0].running_mean, before))
 
 
 if __name__ == "__main__":
