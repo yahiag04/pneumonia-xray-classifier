@@ -68,6 +68,29 @@ def select_best_rows(rows: Sequence[dict]) -> dict[str, dict]:
     return best_by_model
 
 
+def select_threshold(
+    rows: Sequence[dict],
+    metric: str = "balanced_accuracy",
+    min_sensitivity: float | None = None,
+) -> dict:
+    candidates = [dict(row) for row in rows]
+    if min_sensitivity is not None:
+        candidates = [
+            row
+            for row in candidates
+            if float(row.get("sensitivity", 0.0)) >= float(min_sensitivity)
+        ]
+    if not candidates:
+        raise ValueError("No threshold rows satisfy the selection constraints.")
+    if any(metric not in row for row in candidates):
+        raise ValueError(f"Metric '{metric}' is not present in every threshold row.")
+
+    return max(
+        candidates,
+        key=lambda row: (float(row[metric]), -float(row["threshold"])),
+    )
+
+
 def write_sweep_outputs(
     rows: Sequence[dict],
     json_path: str | Path,

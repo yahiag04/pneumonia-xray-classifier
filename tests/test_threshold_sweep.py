@@ -7,6 +7,7 @@ from pathlib import Path
 from thesis.threshold_sweep import (
     compute_threshold_rows,
     select_best_rows,
+    select_threshold,
     write_sweep_outputs,
 )
 from scripts.sweep_nih_thresholds import build_model_rows
@@ -115,6 +116,77 @@ class ThresholdSweepTest(unittest.TestCase):
         self.assertEqual(calls, ["called"])
         self.assertEqual(len(rows), 4)
         self.assertTrue(all(row["seconds_per_image"] == 0.02 for row in rows))
+
+
+class ThresholdSelectionTest(unittest.TestCase):
+    def test_select_threshold_maximizes_metric(self):
+        rows = [
+            {
+                "model_name": "resnet18",
+                "threshold": 0.3,
+                "balanced_accuracy": 0.70,
+                "sensitivity": 0.98,
+            },
+            {
+                "model_name": "resnet18",
+                "threshold": 0.5,
+                "balanced_accuracy": 0.78,
+                "sensitivity": 0.94,
+            },
+            {
+                "model_name": "resnet18",
+                "threshold": 0.7,
+                "balanced_accuracy": 0.76,
+                "sensitivity": 0.90,
+            },
+        ]
+
+        selected = select_threshold(rows, metric="balanced_accuracy")
+
+        self.assertEqual(selected["threshold"], 0.5)
+        self.assertAlmostEqual(selected["balanced_accuracy"], 0.78)
+
+    def test_select_threshold_respects_minimum_sensitivity(self):
+        rows = [
+            {
+                "model_name": "resnet18",
+                "threshold": 0.3,
+                "balanced_accuracy": 0.70,
+                "sensitivity": 0.98,
+            },
+            {
+                "model_name": "resnet18",
+                "threshold": 0.5,
+                "balanced_accuracy": 0.78,
+                "sensitivity": 0.94,
+            },
+            {
+                "model_name": "resnet18",
+                "threshold": 0.7,
+                "balanced_accuracy": 0.76,
+                "sensitivity": 0.90,
+            },
+        ]
+
+        selected = select_threshold(
+            rows, metric="balanced_accuracy", min_sensitivity=0.95
+        )
+
+        self.assertEqual(selected["threshold"], 0.3)
+        self.assertAlmostEqual(selected["sensitivity"], 0.98)
+
+    def test_select_threshold_rejects_unknown_metric(self):
+        rows = [
+            {
+                "model_name": "resnet18",
+                "threshold": 0.5,
+                "balanced_accuracy": 0.78,
+                "sensitivity": 0.94,
+            },
+        ]
+
+        with self.assertRaises(ValueError):
+            select_threshold(rows, metric="missing_metric")
 
 
 if __name__ == "__main__":
