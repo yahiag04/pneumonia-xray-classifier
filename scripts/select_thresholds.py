@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import sys
 from pathlib import Path
@@ -17,14 +18,24 @@ sys.path.insert(0, str(ROOT))
 from thesis.data import ManifestImageDataset, build_internal_splits, build_transforms
 from thesis.model_registry import available_models, build_model
 from thesis.threshold_sweep import (
+    CSV_FIELDS,
     compute_threshold_rows,
+    select_best_rows,
     select_threshold,
-    write_sweep_outputs,
 )
 from thesis.train import choose_device, collect_predictions, evaluate_checkpoint
 
 
 DEFAULT_THRESHOLDS = [round(value / 100, 2) for value in range(5, 96, 5)]
+ALLOWED_SELECTION_METRICS = {
+    "accuracy",
+    "balanced_accuracy",
+    "f1_pneumonia",
+    "pr_auc",
+    "roc_auc",
+    "sensitivity",
+    "specificity",
+}
 
 
 def summarize_threshold_selection(
@@ -55,6 +66,76 @@ def summarize_threshold_selection(
     return {"selected": selected, "rows": rows}
 
 
+def validate_args(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
+    if bool(args.val_manifest) == bool(args.val_data_root):
+        parser.error(
+            "provide exactly one validation source: --val-manifest or --val-data-root"
+        )
+    if args.test_manifest and args.test_data_root:
+        parser.error(
+            "provide at most one test source: --test-manifest or --test-data-root"
+        )
+    if not args.thresholds:
+        parser.error("at least one threshold is required")
+    if any(threshold < 0.0 or threshold > 1.0 for threshold in args.thresholds):
+        parser.error("thresholds must be within [0, 1]")
+    if args.min_sensitivity is not None and not 0.0 <= args.min_sensitivity <= 1.0:
+        parser.error("--min-sensitivity must be within [0, 1]")
+    if args.metric not in ALLOWED_SELECTION_METRICS:
+        parser.error(
+            "--metric must be one of: "
+            + ", ".join(sorted(ALLOWED_SELECTION_METRICS))
+        )
+
+
+def build_selection_payload(
+    metadata: dict,
+    summary: dict,
+    test_metrics: dict | None = None,
+) -> dict:
+    rows = [dict(row) for row in summary["rows"]]
+    payload = {
+        "metadata": dict(metadata),
+        "best_by_model": select_best_rows(rows),
+        "selected": dict(summary["selected"]),
+        "rows": rows,
+    }
+    if test_metrics is not None:
+        payload["test_metrics_at_selected_threshold"] = dict(test_metrics)
+    return payload
+
+
+def write_selection_outputs(
+    summary: dict,
+    metadata: dict,
+    output_json: str | Path,
+    output_csv: str | Path,
+    test_metrics: dict | None = None,
+) -> dict:
+    payload = build_selection_payload(metadata, summary, test_metrics=test_metrics)
+
+    json_path = Path(output_json)
+    json_path.parent.mkdir(parents=True, exist_ok=True)
+    json_path.write_text(json.dumps(payload, indent=2) + "\n")
+
+    csv_path = Path(output_csv)
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
+    ordered_rows = sorted(
+        (dict(row) for row in summary["rows"]),
+        key=lambda row: (str(row["model_name"]), float(row["threshold"])),
+    )
+    with csv_path.open("w", newline="") as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=CSV_FIELDS,
+            extrasaction="ignore",
+            lineterminator="\n",
+        )
+        writer.writeheader()
+        writer.writerows(ordered_rows)
+    return payload
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Select validation thresholds and evaluate selected test thresholds."
@@ -83,19 +164,15 @@ def main() -> int:
     parser.add_argument("--num-workers", type=int, default=0)
     parser.add_argument("--device", default=None)
     args = parser.parse_args()
-
-    if bool(args.val_manifest) == bool(args.val_data_root):
-        raise ValueError(
-            "Provide exactly one validation source: --val-manifest or --val-data-root."
-        )
-    if args.test_manifest and args.test_data_root:
-        raise ValueError(
-            "Provide at most one test source: --test-manifest or --test-data-root."
-        )
+    validate_args(parser, args)
 
     device = choose_device(args.device)
     checkpoint_path = Path(args.checkpoint)
-    model, model_name, image_size = _load_model(checkpoint_path, args.model, device)
+    model, model_name, image_size, checkpoint_config = _load_model(
+        checkpoint_path,
+        args.model,
+        device,
+    )
     criterion = nn.BCEWithLogitsLoss()
     val_dataset = _build_dataset(
         model_name=model_name,
@@ -103,6 +180,7 @@ def main() -> int:
         manifest=args.val_manifest,
         data_root=args.val_data_root,
         split="val",
+        checkpoint_config=checkpoint_config,
     )
     val_loader = DataLoader(
         val_dataset,
@@ -137,8 +215,8 @@ def main() -> int:
         "min_sensitivity": args.min_sensitivity,
         "device": str(device),
     }
-    payload = {"metadata": metadata, **summary}
 
+    test_metrics = None
     if args.test_manifest or args.test_data_root:
         selected_threshold = float(summary["selected"]["threshold"])
         test_kwargs = {
@@ -153,18 +231,15 @@ def main() -> int:
             test_kwargs["manifest_csv"] = args.test_manifest
         else:
             test_kwargs["data_root"] = args.test_data_root
-        payload["test_metrics_at_selected_threshold"] = evaluate_checkpoint(
-            **test_kwargs
-        )
+        test_metrics = evaluate_checkpoint(**test_kwargs)
 
-    write_sweep_outputs(
-        summary["rows"],
-        json_path=args.output_json,
-        csv_path=args.output_csv,
+    payload = write_selection_outputs(
+        summary,
         metadata=metadata,
+        output_json=args.output_json,
+        output_csv=args.output_csv,
+        test_metrics=test_metrics,
     )
-    json_path = Path(args.output_json)
-    json_path.write_text(json.dumps(payload, indent=2) + "\n")
     print(json.dumps(payload["selected"], indent=2))
     return 0
 
@@ -173,7 +248,7 @@ def _load_model(
     checkpoint_path: Path,
     model_name: str | None,
     device: torch.device,
-) -> tuple[nn.Module, str, int]:
+) -> tuple[nn.Module, str, int, dict]:
     checkpoint = torch.load(checkpoint_path, map_location="cpu")
     checkpoint_meta = (
         checkpoint if isinstance(checkpoint, dict) and "model_state" in checkpoint else {}
@@ -189,7 +264,10 @@ def _load_model(
     model.load_state_dict(state_dict)
     model.to(device)
     model.eval()
-    return model, resolved_model_name, image_size
+    checkpoint_config = checkpoint_meta.get("config", {})
+    if not isinstance(checkpoint_config, dict):
+        checkpoint_config = {}
+    return model, resolved_model_name, image_size, checkpoint_config
 
 
 def _build_dataset(
@@ -198,11 +276,19 @@ def _build_dataset(
     manifest: str | None,
     data_root: str | None,
     split: str,
+    checkpoint_config: dict | None = None,
 ):
     transform = build_transforms(model_name, image_size=image_size, train=False)
     if manifest:
         return ManifestImageDataset(manifest, transform=transform)
-    splits = build_internal_splits(data_root, model_name, image_size=image_size)
+    checkpoint_config = checkpoint_config or {}
+    splits = build_internal_splits(
+        data_root,
+        model_name,
+        image_size=image_size,
+        val_fraction=float(checkpoint_config.get("val_fraction", 0.1)),
+        seed=int(checkpoint_config.get("seed", 42)),
+    )
     if split == "val":
         return splits.val
     if splits.test is None:

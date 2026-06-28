@@ -1,8 +1,12 @@
+import argparse
 import csv
+import io
 import json
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest import mock
 
 from thesis.threshold_sweep import (
     compute_threshold_rows,
@@ -10,7 +14,13 @@ from thesis.threshold_sweep import (
     select_threshold,
     write_sweep_outputs,
 )
-from scripts.select_thresholds import summarize_threshold_selection
+from scripts.select_thresholds import (
+    _build_dataset,
+    build_selection_payload,
+    summarize_threshold_selection,
+    validate_args,
+    write_selection_outputs,
+)
 from scripts.sweep_nih_thresholds import build_model_rows
 
 
@@ -207,6 +217,118 @@ class ThresholdSelectionSummaryTest(unittest.TestCase):
         self.assertEqual(summary["selected"]["model_name"], "efficientnet_b0")
         self.assertEqual(summary["selected"]["threshold"], 0.65)
         self.assertEqual(len(summary["rows"]), 2)
+
+    def test_build_selection_payload_preserves_best_by_model(self):
+        rows = [
+            {
+                "model_name": "efficientnet_b0",
+                "checkpoint": "best.pt",
+                "threshold": 0.5,
+                "balanced_accuracy": 0.75,
+                "sensitivity": 0.8,
+            },
+            {
+                "model_name": "efficientnet_b0",
+                "checkpoint": "best.pt",
+                "threshold": 0.65,
+                "balanced_accuracy": 0.8,
+                "sensitivity": 0.7,
+            },
+        ]
+        summary = {"selected": rows[1], "rows": rows}
+        metadata = {"selection_metric": "balanced_accuracy"}
+
+        payload = build_selection_payload(
+            metadata,
+            summary,
+            test_metrics={"accuracy": 0.9},
+        )
+
+        self.assertEqual(payload["metadata"], metadata)
+        self.assertEqual(payload["selected"], rows[1])
+        self.assertEqual(payload["rows"], rows)
+        self.assertEqual(
+            payload["best_by_model"]["efficientnet_b0"]["threshold"],
+            0.65,
+        )
+        self.assertEqual(payload["test_metrics_at_selected_threshold"]["accuracy"], 0.9)
+
+    def test_write_selection_outputs_writes_custom_json_and_csv(self):
+        rows = compute_threshold_rows(
+            model_name="resnet18",
+            checkpoint="best.pt",
+            labels=[0, 1],
+            probabilities=[0.2, 0.8],
+            thresholds=[0.5],
+            loss=0.1,
+            seconds_per_image=0.02,
+        )
+        summary = {"selected": rows[0], "rows": rows}
+        metadata = {"selection_metric": "balanced_accuracy"}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            json_path = Path(tmp) / "selection.json"
+            csv_path = Path(tmp) / "selection.csv"
+
+            write_selection_outputs(
+                summary,
+                metadata=metadata,
+                output_json=json_path,
+                output_csv=csv_path,
+            )
+
+            payload = json.loads(json_path.read_text())
+            with csv_path.open(newline="") as handle:
+                csv_rows = list(csv.DictReader(handle))
+
+        self.assertIn("best_by_model", payload)
+        self.assertIn("selected", payload)
+        self.assertEqual(payload["selected"]["threshold"], 0.5)
+        self.assertEqual(len(csv_rows), 1)
+
+    def test_build_dataset_uses_checkpoint_split_settings(self):
+        splits = SimpleNamespace(val="validation-dataset", test="test-dataset")
+        with mock.patch(
+            "scripts.select_thresholds.build_transforms",
+            return_value="transform",
+        ), mock.patch(
+            "scripts.select_thresholds.build_internal_splits",
+            return_value=splits,
+        ) as build_splits:
+            dataset = _build_dataset(
+                model_name="resnet18",
+                image_size=320,
+                manifest=None,
+                data_root="data/chest_xray",
+                split="val",
+                checkpoint_config={"val_fraction": 0.2, "seed": 7},
+            )
+
+        self.assertEqual(dataset, "validation-dataset")
+        build_splits.assert_called_once_with(
+            "data/chest_xray",
+            "resnet18",
+            image_size=320,
+            val_fraction=0.2,
+            seed=7,
+        )
+
+    def test_validate_args_rejects_invalid_cli_inputs_before_inference(self):
+        parser = argparse.ArgumentParser()
+        args = SimpleNamespace(
+            val_manifest="val.csv",
+            val_data_root="data",
+            test_manifest=None,
+            test_data_root=None,
+            thresholds=[0.5],
+            min_sensitivity=None,
+            metric="balanced_accuracy",
+        )
+
+        with mock.patch("sys.stderr", new=io.StringIO()), self.assertRaises(
+            SystemExit
+        ):
+            validate_args(parser, args)
 
 
 if __name__ == "__main__":
