@@ -17,6 +17,7 @@ from thesis.threshold_sweep import (
 from scripts.select_thresholds import (
     _build_dataset,
     build_selection_payload,
+    evaluate_selected_threshold,
     summarize_threshold_selection,
     validate_args,
     write_selection_outputs,
@@ -312,6 +313,86 @@ class ThresholdSelectionSummaryTest(unittest.TestCase):
             val_fraction=0.2,
             seed=7,
         )
+
+    def test_build_test_dataset_uses_checkpoint_split_settings(self):
+        splits = SimpleNamespace(val="validation-dataset", test="test-dataset")
+        with mock.patch(
+            "scripts.select_thresholds.build_transforms",
+            return_value="transform",
+        ), mock.patch(
+            "scripts.select_thresholds.build_internal_splits",
+            return_value=splits,
+        ) as build_splits:
+            dataset = _build_dataset(
+                model_name="resnet18",
+                image_size=320,
+                manifest=None,
+                data_root="data/chest_xray",
+                split="test",
+                checkpoint_config={"val_fraction": 0.2, "seed": 7},
+            )
+
+        self.assertEqual(dataset, "test-dataset")
+        build_splits.assert_called_once_with(
+            "data/chest_xray",
+            "resnet18",
+            image_size=320,
+            val_fraction=0.2,
+            seed=7,
+        )
+
+    def test_evaluate_selected_threshold_uses_selected_threshold(self):
+        model = object()
+        dataset = [("image-a", 0), ("image-b", 1)]
+        criterion = object()
+        device = object()
+
+        with mock.patch(
+            "scripts.select_thresholds.DataLoader",
+            return_value="loader",
+        ) as data_loader, mock.patch(
+            "scripts.select_thresholds.collect_predictions",
+            return_value={
+                "labels": [0, 1],
+                "probabilities": [0.4, 0.6],
+                "loss": 0.2,
+                "num_samples": 2,
+                "elapsed_seconds": 0.04,
+            },
+        ) as collect, mock.patch(
+            "scripts.select_thresholds.compute_binary_metrics",
+            return_value={"accuracy": 1.0},
+        ) as compute_metrics:
+            metrics = evaluate_selected_threshold(
+                model=model,
+                dataset=dataset,
+                criterion=criterion,
+                device=device,
+                checkpoint="best.pt",
+                model_name="resnet18",
+                threshold=0.65,
+                batch_size=16,
+                num_workers=2,
+            )
+
+        data_loader.assert_called_once_with(
+            dataset,
+            batch_size=16,
+            shuffle=False,
+            num_workers=2,
+        )
+        collect.assert_called_once_with(model, "loader", criterion, device)
+        compute_metrics.assert_called_once_with(
+            [0, 1],
+            [0.4, 0.6],
+            threshold=0.65,
+        )
+        self.assertEqual(metrics["accuracy"], 1.0)
+        self.assertEqual(metrics["checkpoint"], "best.pt")
+        self.assertEqual(metrics["model_name"], "resnet18")
+        self.assertEqual(metrics["num_samples"], 2)
+        self.assertEqual(metrics["loss"], 0.2)
+        self.assertEqual(metrics["seconds_per_image"], 0.02)
 
     def test_validate_args_rejects_invalid_cli_inputs_before_inference(self):
         parser = argparse.ArgumentParser()

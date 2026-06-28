@@ -23,7 +23,8 @@ from thesis.threshold_sweep import (
     select_best_rows,
     select_threshold,
 )
-from thesis.train import choose_device, collect_predictions, evaluate_checkpoint
+from thesis.metrics import compute_binary_metrics
+from thesis.train import choose_device, collect_predictions
 
 
 DEFAULT_THRESHOLDS = [round(value / 100, 2) for value in range(5, 96, 5)]
@@ -136,6 +137,41 @@ def write_selection_outputs(
     return payload
 
 
+def evaluate_selected_threshold(
+    model: nn.Module,
+    dataset,
+    criterion: nn.Module,
+    device: torch.device,
+    checkpoint: str,
+    model_name: str,
+    threshold: float,
+    batch_size: int,
+    num_workers: int,
+) -> dict:
+    loader = DataLoader(
+        dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=num_workers,
+    )
+    predictions = collect_predictions(model, loader, criterion, device)
+    metrics = compute_binary_metrics(
+        predictions["labels"],
+        predictions["probabilities"],
+        threshold=threshold,
+    )
+    num_samples = int(predictions["num_samples"])
+    metrics["loss"] = predictions["loss"]
+    metrics["seconds_per_image"] = float(predictions["elapsed_seconds"]) / max(
+        num_samples,
+        1,
+    )
+    metrics["checkpoint"] = checkpoint
+    metrics["model_name"] = model_name
+    metrics["num_samples"] = num_samples
+    return metrics
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Select validation thresholds and evaluate selected test thresholds."
@@ -219,19 +255,25 @@ def main() -> int:
     test_metrics = None
     if args.test_manifest or args.test_data_root:
         selected_threshold = float(summary["selected"]["threshold"])
-        test_kwargs = {
-            "checkpoint_path": checkpoint_path,
-            "model_name": model_name,
-            "batch_size": args.batch_size,
-            "num_workers": args.num_workers,
-            "threshold": selected_threshold,
-            "device": str(device),
-        }
-        if args.test_manifest:
-            test_kwargs["manifest_csv"] = args.test_manifest
-        else:
-            test_kwargs["data_root"] = args.test_data_root
-        test_metrics = evaluate_checkpoint(**test_kwargs)
+        test_dataset = _build_dataset(
+            model_name=model_name,
+            image_size=image_size,
+            manifest=args.test_manifest,
+            data_root=args.test_data_root,
+            split="test",
+            checkpoint_config=checkpoint_config,
+        )
+        test_metrics = evaluate_selected_threshold(
+            model=model,
+            dataset=test_dataset,
+            criterion=criterion,
+            device=device,
+            checkpoint=str(checkpoint_path),
+            model_name=model_name,
+            threshold=selected_threshold,
+            batch_size=args.batch_size,
+            num_workers=args.num_workers,
+        )
 
     payload = write_selection_outputs(
         summary,
