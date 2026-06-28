@@ -10,6 +10,7 @@ from thesis.threshold_sweep import (
     select_threshold,
     write_sweep_outputs,
 )
+from scripts.select_thresholds import summarize_threshold_selection
 from scripts.sweep_nih_thresholds import build_model_rows
 
 
@@ -187,6 +188,25 @@ class ThresholdSelectionTest(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             select_threshold(rows, metric="missing_metric")
+
+
+class ThresholdSelectionSummaryTest(unittest.TestCase):
+    def test_summarize_threshold_selection_returns_selected_row_and_rows(self):
+        summary = summarize_threshold_selection(
+            model_name="efficientnet_b0",
+            checkpoint="outputs/runs_fair/efficientnet_b0/best.pt",
+            labels=[0, 0, 1, 1],
+            probabilities=[0.1, 0.6, 0.7, 0.9],
+            thresholds=[0.5, 0.65],
+            loss=0.2,
+            seconds_per_image=0.01,
+            metric="balanced_accuracy",
+            min_sensitivity=None,
+        )
+
+        self.assertEqual(summary["selected"]["model_name"], "efficientnet_b0")
+        self.assertEqual(summary["selected"]["threshold"], 0.65)
+        self.assertEqual(len(summary["rows"]), 2)
 
 
 if __name__ == "__main__":
