@@ -70,7 +70,7 @@ def main() -> int:
     model.to(device)
 
     criterion = nn.BCEWithLogitsLoss()
-    optimizer = torch.optim.Adam(trainable_parameters(model), lr=args.lr)
+    optimizer = build_optimizer(model, args.lr)
     best_val_loss = float("inf")
     best_epoch = 0
     no_improve = 0
@@ -142,6 +142,13 @@ def main() -> int:
 
 def trainable_parameters(model):
     return [parameter for parameter in model.parameters() if parameter.requires_grad]
+
+
+def build_optimizer(model, lr: float):
+    params = trainable_parameters(model)
+    if not params:
+        raise ValueError("No trainable parameters found. Check --trainable-mode and model configuration.")
+    return torch.optim.Adam(params, lr=lr)
 
 
 def train_epoch(model, loader, criterion, optimizer, device):
