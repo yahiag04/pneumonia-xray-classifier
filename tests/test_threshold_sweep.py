@@ -269,6 +269,35 @@ class ThresholdSelectionSummaryTest(unittest.TestCase):
         )
         self.assertEqual(payload["test_metrics_at_selected_threshold"]["accuracy"], 0.9)
 
+    def test_build_selection_payload_uses_selection_metric_for_best_by_model(self):
+        rows = [
+            {
+                "model_name": "efficientnet_b0",
+                "checkpoint": "best.pt",
+                "threshold": 0.35,
+                "balanced_accuracy": 0.80,
+                "f1_pneumonia": 0.70,
+                "sensitivity": 0.99,
+            },
+            {
+                "model_name": "efficientnet_b0",
+                "checkpoint": "best.pt",
+                "threshold": 0.65,
+                "balanced_accuracy": 0.75,
+                "f1_pneumonia": 0.90,
+                "sensitivity": 0.96,
+            },
+        ]
+        summary = {"selected": rows[1], "rows": rows}
+        metadata = {"selection_metric": "f1_pneumonia", "min_sensitivity": 0.95}
+
+        payload = build_selection_payload(metadata, summary)
+
+        self.assertEqual(
+            payload["best_by_model"]["efficientnet_b0"]["threshold"],
+            0.65,
+        )
+
     def test_write_selection_outputs_writes_custom_json_and_csv(self):
         rows = compute_threshold_rows(
             model_name="resnet18",

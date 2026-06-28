@@ -17,12 +17,7 @@ sys.path.insert(0, str(ROOT))
 
 from thesis.data import ManifestImageDataset, build_internal_splits, build_transforms
 from thesis.model_registry import available_models, build_model
-from thesis.threshold_sweep import (
-    CSV_FIELDS,
-    compute_threshold_rows,
-    select_best_rows,
-    select_threshold,
-)
+from thesis.threshold_sweep import CSV_FIELDS, compute_threshold_rows, select_threshold
 from thesis.metrics import compute_binary_metrics
 from thesis.train import choose_device, collect_predictions
 
@@ -97,15 +92,39 @@ def build_selection_payload(
     test_metrics: dict | None = None,
 ) -> dict:
     rows = [dict(row) for row in summary["rows"]]
+    metric = str(metadata.get("selection_metric", "balanced_accuracy"))
+    min_sensitivity = metadata.get("min_sensitivity")
     payload = {
         "metadata": dict(metadata),
-        "best_by_model": select_best_rows(rows),
+        "best_by_model": select_best_rows_for_metric(
+            rows,
+            metric=metric,
+            min_sensitivity=min_sensitivity,
+        ),
         "selected": dict(summary["selected"]),
         "rows": rows,
     }
     if test_metrics is not None:
         payload["test_metrics_at_selected_threshold"] = dict(test_metrics)
     return payload
+
+
+def select_best_rows_for_metric(
+    rows: Sequence[dict],
+    metric: str,
+    min_sensitivity: float | None = None,
+) -> dict[str, dict]:
+    rows_by_model: dict[str, list[dict]] = {}
+    for row in rows:
+        rows_by_model.setdefault(str(row["model_name"]), []).append(dict(row))
+    return {
+        model_name: select_threshold(
+            model_rows,
+            metric=metric,
+            min_sensitivity=min_sensitivity,
+        )
+        for model_name, model_rows in rows_by_model.items()
+    }
 
 
 def write_selection_outputs(

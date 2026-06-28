@@ -53,7 +53,7 @@ def main() -> int:
         raise ValueError("Model name is required for legacy checkpoints without metadata.")
     image_size = int(checkpoint_meta.get("image_size", 224))
 
-    run_dir = Path(args.output_dir) / model_name
+    run_dir = Path(build_run_dir(args.output_dir, model_name, args.trainable_mode))
     run_dir.mkdir(parents=True, exist_ok=True)
     best_path = run_dir / "best.pt"
 
@@ -151,8 +151,26 @@ def build_optimizer(model, lr: float):
     return torch.optim.Adam(params, lr=lr)
 
 
+def build_run_dir(output_dir: str | Path, model_name: str, trainable_mode: str) -> str:
+    output_dir = Path(output_dir)
+    run_name = f"{model_name}_{trainable_mode}"
+    if output_dir.name == run_name:
+        return str(output_dir)
+    return str(output_dir / run_name)
+
+
+def keep_frozen_modules_eval(model):
+    for module in model.modules():
+        if module is model:
+            continue
+        params = list(module.parameters(recurse=True))
+        if params and not any(parameter.requires_grad for parameter in params):
+            module.eval()
+
+
 def train_epoch(model, loader, criterion, optimizer, device):
     model.train()
+    keep_frozen_modules_eval(model)
     total_loss = 0.0
     total = 0
     for x, y in loader:
