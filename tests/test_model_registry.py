@@ -76,6 +76,18 @@ class TrainableModeTest(unittest.TestCase):
 
         self.assertTrue(all(parameter.requires_grad for parameter in model.parameters()))
 
+    def test_configure_trainable_layers_pneumonia_net_head_mode_leaves_parameters_unchanged(self):
+        model = nn.Sequential(nn.Linear(2, 2), nn.Linear(2, 1))
+        next(model[1].parameters()).requires_grad = False
+        original_requires_grad = [parameter.requires_grad for parameter in model.parameters()]
+
+        configure_trainable_layers(model, "pneumonia_net", "head")
+
+        self.assertEqual(
+            original_requires_grad,
+            [parameter.requires_grad for parameter in model.parameters()],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

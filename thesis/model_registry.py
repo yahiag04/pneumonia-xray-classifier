@@ -61,10 +61,12 @@ def configure_trainable_layers(model: nn.Module, model_name: str, mode: str) -> 
     mode = mode.lower()
     if mode not in {"all", "head", "last_block"}:
         raise ValueError("Trainable mode must be one of: all, head, last_block")
+    if model_name == "pneumonia_net":
+        return model
 
     for parameter in model.parameters():
         parameter.requires_grad = mode == "all"
-    if mode == "all" or model_name == "pneumonia_net":
+    if mode == "all":
         return model
 
     if model_name in {"resnet18", "resnet50"}:
