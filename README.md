@@ -1,61 +1,72 @@
+# Pneumonia X-ray Classifier
 
+Repository for an academic thesis project on binary chest X-ray classification:
+`normal` vs `pneumonia`.
 
-# Medical Imaging Classifier
+The project compares a custom CNN (`PneumoniaNet`) with common convolutional
+architectures and evaluates their behavior across internal and external
+datasets, including zero-shot tests and post-training fine-tuning experiments.
 
-<img width="1532" height="846" alt="Screenshot 2025-12-10 alle 23 25 52" src="https://github.com/user-attachments/assets/4a5f9f09-0fc9-43e4-8af2-f70722824a40" />
+This is a research prototype. It is not a medical device and must not be used
+for diagnosis or treatment decisions.
 
-A Streamlit-based application for classifying chest X‑ray images using a custom convolutional neural network.  
-The system predicts **Normal** vs **Pneumonia**, provides confidence scores, and generates a downloadable PDF report.
+## What is included
 
-This project is an academic prototype focused on machine learning experimentation and user‑friendly model visualization.  
-It is **not** a medical device and must not be used for diagnostic or clinical decisions.
+- `thesis/`: reusable training, evaluation, metrics, NIH parsing and threshold
+  utilities.
+- `models/`: custom `PneumoniaNet` architecture.
+- `scripts/`: command-line scripts for training, evaluation, fine-tuning,
+  manifest preparation and plotting.
+- `tests/`: unit tests for the reusable thesis code.
 
----
+Generated datasets, model checkpoints and experiment outputs are intentionally
+excluded from Git. They are large and/or local-machine specific.
 
-## Features
-
-- Streamlit web interface  
-- Image upload and preprocessing  
-- Pneumonia classification using a custom CNN  
-- Real‑time prediction with probability score  
-- Automatic PDF report generation  
-- Device‑aware inference (CPU, CUDA, MPS)
-
----
-
-## How It Works
-
-1. Upload a chest X‑ray image (JPG or PNG).  
-2. The app applies the appropriate preprocessing pipeline.  
-3. The model outputs:
-   - predicted class (Normal / Pneumonia)  
-   - probability score  
-   - confidence level  
-4. A structured PDF report can be generated and downloaded.
-
----
-
-## Tech Stack
-
-- Python  
-- PyTorch  
-- Streamlit  
-- PIL  
-- ReportLab  
-
----
-
-## Installation
+## Setup
 
 ```bash
+python -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
-streamlit run app.py
 ```
 
----
+## Run tests
 
-## Disclaimer
+```bash
+PYTHONDONTWRITEBYTECODE=1 python -m unittest discover -s tests -v
+```
 
-This tool is for **research and educational purposes only**.  
-It is not approved for medical use and must not replace professional interpretation.
+## Main scripts
 
+Train a model on an ImageFolder dataset:
+
+```bash
+python scripts/train_model.py --help
+```
+
+Evaluate a checkpoint on a CSV manifest:
+
+```bash
+python scripts/evaluate_model.py --help
+```
+
+Fine-tune an existing checkpoint:
+
+```bash
+python scripts/finetune_model.py --help
+```
+
+Select a decision threshold on validation predictions:
+
+```bash
+python scripts/select_thresholds.py --help
+```
+
+## Reproducibility notes
+
+The repository does not include:
+
+- raw X-ray datasets;
+- generated manifests under `outputs/`;
+- trained checkpoints (`.pt`, `.pth`, `.ckpt`);
+- local cache files or Python bytecode.

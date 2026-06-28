@@ -1,1 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# OS / editor files
+.DS_Store
+.idea/
+.vscode/
+
+# Local datasets and generated artifacts
+data/
+third dataset/
+outputs/
+weights/
+metriche_valutazione/
+docs/
+*.pdf
+
+# Large model checkpoints
+*.pt
+*.pth
+*.ckpt
+
+# Local worktrees
 .worktrees/
