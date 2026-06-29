@@ -23,6 +23,7 @@ outputs/
 weights/
 metriche_valutazione/
 docs/
+*.tex
 *.pdf
 
 # Large model checkpoints

@@ -56,6 +56,18 @@ Fine-tune an existing checkpoint:
 python scripts/finetune_model.py --help
 ```
 
+Prepare the adult RSNA branch after downloading the Kaggle competition files:
+
+```bash
+python scripts/prepare_rsna_binary.py --help
+```
+
+Train all adult-branch models and evaluate external manifests:
+
+```bash
+python scripts/run_adult_branch.py --help
+```
+
 Select a decision threshold on validation predictions:
 
 ```bash

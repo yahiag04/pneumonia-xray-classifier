@@ -7,3 +7,5 @@ matplotlib
 seaborn
 streamlit
 reportlab
+torchxrayvision
+pydicom
