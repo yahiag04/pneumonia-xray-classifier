@@ -261,8 +261,10 @@ metrica principale e' la \balacc:
 \frac{\text{Sensitivity} + \text{Specificity}}{2}.
 \]
 
-Sono state inoltre riportate accuracy, sensitivity, specificity, ROC-AUC,
-PR-AUC, F1-score e confusion matrix. Per la parte finale sono stati aggiunti:
+Negli output sperimentali sono state inoltre calcolate accuracy, sensitivity,
+specificity, ROC-AUC, PR-AUC, F1-score e confusion matrix; le tabelle finali si
+concentrano sulle metriche piu' rilevanti per la discussione, cioe' \balacc{},
+sensitivity, specificity e ROC-AUC. Per la parte finale sono stati aggiunti:
 
 \begin{itemize}
   \item \textbf{bootstrap confidence intervals}: intervalli al 95\% tramite
@@ -413,9 +415,9 @@ scelta piu' efficiente se si considera il numero di operazioni.
 Per isolare l'effetto della capacita' del modello e' stato aggiunto uno studio
 di scaling controllato sullo stesso task binario RSNA. L'obiettivo non e'
 scegliere un nuovo modello finale, ma misurare quanta capacita' serve per
-avvicinarsi alla top-performance mantenendo invariati dataset, seed,
-augmentation, soglia 0.5, early stopping e loop di training. La sola variabile
-sperimentale e' la complessita' dell'architettura.
+avvicinarsi alla top-performance. L'intento del protocollo e' mantenere invariati
+dataset, seed, augmentation, soglia 0.5, early stopping e loop di training,
+facendo variare la complessita' dell'architettura.
 
 Sono state costruite due curve:
 
@@ -505,9 +507,9 @@ Il risultato piu' pulito riguarda RSNA interno. Per PneumoniaNet, passare da
 75457 parametri a 4.78 milioni di parametri cambia la \balacc{} solo da 0.922 a
 0.923, con massimo osservato 0.924 a \(w=3.0\). Anche nella famiglia
 EfficientNet la curva non migliora con la dimensione: B0 ottiene 0.950, B1
-0.946, B2 0.947 e B3 0.936. La performance interna satura quindi ben prima del
-limite di capacita' esplorato, ma l'andamento va letto come piatto entro la
-variabilita' del training piu' che come plateau monotono.
+0.946, B2 0.947 e B3 0.936. La curva interna risulta quindi gia' quasi piatta
+nel range esplorato, entro la variabilita' del training, piu' che un plateau
+monotono pulito.
 
 Sui dataset esterni, invece, le curve non sono monotone. PneumoniaNet oscilla da
 0.666 a 0.724 su Kermany e da 0.756 a 0.817 su Chittagong. EfficientNet mostra
@@ -519,8 +521,8 @@ sulla generalizzazione esterna. Lo studio mostra una curva interna quasi piatta,
 ma non consente una conclusione forte sullo scaling esterno.
 
 Operativamente, il prossimo passo non e' soltanto aumentare la capacita', ma
-misurare la variabilita'. Lo stesso script permette di rilanciare lo studio con
-piu' seed e con una dimensione del training set diversa tramite
+misurare la variabilita'. Lo stesso script puo' essere rilanciato piu' volte
+variando \texttt{--seed} e cambiando la dimensione del training set tramite
 \texttt{--train-size}. Solo una curva multi-seed, eventualmente ripetuta con
 piu' immagini RSNA, puo' distinguere saturazione da capacita', saturazione da
 dati e rumore stocastico del training.
@@ -770,8 +772,9 @@ I risultati vanno letti tenendo presenti alcune limitazioni metodologiche.
   \item \textbf{Scaling controllato su una sola dimensione dati}: lo studio di
   scaling usa il subset RSNA corrente come default. I modelli piu' grandi
   potrebbero essere limitati anche dal numero di immagini disponibili, non solo
-  dalla propria capacita'. Per questo lo script espone \texttt{--train-size},
-  cosi' lo stesso protocollo puo' essere rilanciato con piu' esempi e piu' seed.
+  dalla propria capacita'. Per questo lo script espone \texttt{--train-size} e
+  \texttt{--seed}, cosi' lo stesso protocollo puo' essere rilanciato con piu'
+  esempi e seed diversi.
   \item \textbf{Delta crossover}: il range riportato per il miglioramento da
   training Kermany a training RSNA e' descrittivo e usa solo cinque architetture
   come unita' di confronto. Non e' un intervallo inferenziale sui singoli
