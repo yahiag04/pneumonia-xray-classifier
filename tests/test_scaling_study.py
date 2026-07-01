@@ -4,7 +4,7 @@ from pathlib import Path
 
 from PIL import Image
 
-from scripts.run_scaling_study import find_saturation_knee, metric_columns, scaling_run_id
+from scripts.run_scaling_study import build_scaling_specs, find_saturation_knee, metric_columns, scaling_run_id
 from thesis.data import BinaryImageDataset, make_balanced_subset
 
 
@@ -29,6 +29,14 @@ class BalancedTrainSubsetTest(unittest.TestCase):
 
 
 class ScalingStudyUtilityTest(unittest.TestCase):
+    def test_build_scaling_specs_can_select_only_efficientnet_family(self):
+        specs = build_scaling_specs(family="efficientnet")
+
+        self.assertEqual(
+            [spec["model_name"] for spec in specs],
+            ["efficientnet_b0", "efficientnet_b1", "efficientnet_b2", "efficientnet_b3"],
+        )
+
     def test_scaling_run_id_identifies_family_variant_and_width(self):
         self.assertEqual(
             scaling_run_id({"family": "pneumonia_net", "width": 1.5}),

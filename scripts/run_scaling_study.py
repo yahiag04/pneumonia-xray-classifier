@@ -49,25 +49,29 @@ def metric_columns(dataset_names: list[str]) -> list[str]:
 def build_scaling_specs(
     pneumonia_widths: list[float] | None = None,
     efficientnet_variants: list[str] | None = None,
+    family: str = "all",
 ) -> list[dict[str, Any]]:
-    specs = [
-        {
-            "family": "pneumonia_net",
-            "variant": f"width_{width:g}",
-            "model_name": "pneumonia_net",
-            "width": width,
-        }
-        for width in (pneumonia_widths or PNEUMONIA_WIDTHS)
-    ]
-    specs.extend(
-        {
-            "family": "efficientnet",
-            "variant": variant,
-            "model_name": variant,
-            "width": 1.0,
-        }
-        for variant in (efficientnet_variants or EFFICIENTNET_VARIANTS)
-    )
+    specs = []
+    if family in {"all", "pneumonia_net"}:
+        specs.extend(
+            {
+                "family": "pneumonia_net",
+                "variant": f"width_{width:g}",
+                "model_name": "pneumonia_net",
+                "width": width,
+            }
+            for width in (pneumonia_widths or PNEUMONIA_WIDTHS)
+        )
+    if family in {"all", "efficientnet"}:
+        specs.extend(
+            {
+                "family": "efficientnet",
+                "variant": variant,
+                "model_name": variant,
+                "width": 1.0,
+            }
+            for variant in (efficientnet_variants or EFFICIENTNET_VARIANTS)
+        )
     return specs
 
 
@@ -81,7 +85,7 @@ def run_scaling_study(args: argparse.Namespace) -> list[dict[str, Any]]:
     dataset_names = ["rsna"] + [name for name, _ in manifests]
     rows = []
 
-    for spec in build_scaling_specs(args.pneumonia_width, args.efficientnet_variant):
+    for spec in build_scaling_specs(args.pneumonia_width, args.efficientnet_variant, args.family):
         run_id = scaling_run_id(spec)
         summary = train_model(
             TrainConfig(
@@ -274,6 +278,12 @@ def main() -> None:
     parser.add_argument("--output-dir", default="outputs/scaling_study")
     parser.add_argument("--manifest", action="append", type=parse_manifest_arg, default=[])
     parser.add_argument("--pneumonia-width", action="append", type=float, default=None)
+    parser.add_argument(
+        "--family",
+        choices=["all", "pneumonia_net", "efficientnet"],
+        default="all",
+        help="Run both families, only PneumoniaNet widths, or only EfficientNet variants.",
+    )
     parser.add_argument(
         "--efficientnet-variant",
         action="append",
