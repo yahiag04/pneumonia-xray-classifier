@@ -54,10 +54,22 @@ Fine-tune an existing checkpoint:
 python scripts/finetune_model.py --help
 ```
 
+Profile model parameters, GMAC and performance-per-GMAC summaries:
+
+```bash
+python scripts/profile_model_complexity.py --help
+```
+
 Prepare the adult RSNA branch after downloading the Kaggle competition files:
 
 ```bash
 python scripts/prepare_rsna_binary.py --help
+```
+
+Prepare the 3-class RSNA branch after downloading the Kaggle competition files:
+
+```bash
+python scripts/prepare_rsna_multiclass.py --help
 ```
 
 Train all adult-branch models and evaluate external manifests:
@@ -66,11 +78,25 @@ Train all adult-branch models and evaluate external manifests:
 python scripts/run_adult_branch.py --help
 ```
 
+Train or evaluate one model on the 3-class RSNA task:
+
+```bash
+python scripts/train_multiclass_model.py --help
+python scripts/evaluate_multiclass_model.py --help
+```
+
 Select a decision threshold on validation predictions:
 
 ```bash
 python scripts/select_thresholds.py --help
 ```
+
+## Thesis follow-ups
+
+- Computational profile: report parameters and GMAC for each comparison model.
+- Performance/cost study: compare balanced accuracy against GMAC.
+- Multiclass extension: add the third RSNA class (`No Lung Opacity / Not Normal`)
+  and evaluate the task as multi-class classification.
 
 ## Reproducibility notes
 

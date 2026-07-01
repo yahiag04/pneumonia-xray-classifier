@@ -19,35 +19,35 @@ def available_models() -> tuple[str, ...]:
     return _MODEL_NAMES
 
 
-def build_model(name: str, pretrained: bool = True) -> nn.Module:
+def build_model(name: str, pretrained: bool = True, num_classes: int = 1) -> nn.Module:
     name = name.lower()
     if name == "pneumonia_net":
-        return PneumoniaNet()
+        return PneumoniaNet(num_classes=num_classes)
 
     models = _torchvision_models()
     if name == "resnet18":
         model = models.resnet18(weights=models.ResNet18_Weights.DEFAULT if pretrained else None)
-        model.fc = nn.Linear(model.fc.in_features, 1)
+        model.fc = nn.Linear(model.fc.in_features, num_classes)
         return model
     if name == "resnet50":
         model = models.resnet50(weights=models.ResNet50_Weights.DEFAULT if pretrained else None)
-        model.fc = nn.Linear(model.fc.in_features, 1)
+        model.fc = nn.Linear(model.fc.in_features, num_classes)
         return model
     if name == "densenet121":
         model = models.densenet121(weights=models.DenseNet121_Weights.DEFAULT if pretrained else None)
-        model.classifier = nn.Linear(model.classifier.in_features, 1)
+        model.classifier = nn.Linear(model.classifier.in_features, num_classes)
         return model
     if name == "efficientnet_b0":
         model = models.efficientnet_b0(
             weights=models.EfficientNet_B0_Weights.DEFAULT if pretrained else None
         )
-        model.classifier[-1] = nn.Linear(model.classifier[-1].in_features, 1)
+        model.classifier[-1] = nn.Linear(model.classifier[-1].in_features, num_classes)
         return model
     if name == "mobilenet_v3_large":
         model = models.mobilenet_v3_large(
             weights=models.MobileNet_V3_Large_Weights.DEFAULT if pretrained else None
         )
-        model.classifier[-1] = nn.Linear(model.classifier[-1].in_features, 1)
+        model.classifier[-1] = nn.Linear(model.classifier[-1].in_features, num_classes)
         return model
     raise ValueError(f"Unknown model '{name}'. Available models: {', '.join(_MODEL_NAMES)}")
 

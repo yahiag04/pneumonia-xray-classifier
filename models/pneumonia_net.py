@@ -3,7 +3,7 @@ import torch.nn.functional as F
 
 
 class PneumoniaNet(nn.Module):
-    def __init__(self):
+    def __init__(self, num_classes=1):
         super().__init__()
 
         self.conv1 = nn.Conv2d(1, 16, 3, padding=1)
@@ -29,7 +29,7 @@ class PneumoniaNet(nn.Module):
 
         self.fc1 = nn.Linear(128, 64)
         self.drop = nn.Dropout(0.5)
-        self.fc2 = nn.Linear(64, 1)
+        self.fc2 = nn.Linear(64, num_classes)
 
     def forward(self, x):
         x = self.pool(F.relu(self.bn1(self.conv1(x))))

@@ -38,6 +38,15 @@ class ModelRegistryTest(unittest.TestCase):
 
         self.assertEqual(tuple(out.shape), (2, 1))
 
+    def test_pneumonia_net_can_output_three_multiclass_logits(self):
+        model = build_model("pneumonia_net", pretrained=False, num_classes=3)
+        model.eval()
+
+        with torch.no_grad():
+            out = model(torch.zeros(2, 1, 224, 224))
+
+        self.assertEqual(tuple(out.shape), (2, 3))
+
     def test_freeze_backbone_keeps_resnet_classifier_trainable(self):
         model = build_model("resnet18", pretrained=False)
 
