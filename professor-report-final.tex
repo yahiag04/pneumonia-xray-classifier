@@ -410,6 +410,108 @@ offrono un compromesso piu' favorevole tra prestazioni e costo. Su Chittagong
 PneumoniaNet e' competitiva in \balacc{}, mentre MobileNetV3-Large resta la
 scelta piu' efficiente se si considera il numero di operazioni.
 
+\section{Studio di scaling controllato}
+
+Per isolare l'effetto della capacita' del modello e' stato aggiunto uno studio
+di scaling controllato sullo stesso task binario RSNA. L'obiettivo non e'
+scegliere un nuovo modello finale, ma misurare quanta capacita' serve per
+avvicinarsi alla top-performance mantenendo invariati dataset, seed,
+augmentation, soglia 0.5, early stopping e loop di training. La sola variabile
+sperimentale e' la complessita' dell'architettura.
+
+Sono state costruite due curve:
+
+\begin{itemize}
+  \item \textbf{PneumoniaNet continua}: la rete custom e' stata resa parametrica
+  con un moltiplicatore di larghezza \(w\). I canali base
+  \(16,32,64,128\) e la testa fully-connected vengono scalati da \(w\).
+  Il caso \(w=1.0\) riproduce esattamente la rete originale e mantiene
+  300161 parametri.
+  \item \textbf{EfficientNet discreta}: sono state addestrate le varianti
+  ufficiali ImageNet-pretrained B0, B1, B2 e B3, senza modificare la struttura
+  interna delle architetture.
+\end{itemize}
+
+La dimensione del training set e' stata resa parametrica nello script
+\path{scripts/run_scaling_study.py}; nel risultato riportato qui e' stato usato
+il subset RSNA corrente, cioe' 2500 immagini normali e 2500 immagini con
+opacita' nel training set. Questa scelta rende il confronto direttamente
+comparabile con gli esperimenti principali.
+
+\begin{table}[H]
+\centering
+\caption{Scaling continuo di PneumoniaNet. BA = balanced accuracy.}
+\small
+\begin{tabular}{lrrrrr}
+\toprule
+Width & Parametri & GMAC & RSNA BA & Kermany BA & Chittagong BA \\
+\midrule
+0.5 & 75457 & 0.134 & 0.922 & 0.716 & 0.815 \\
+1.0 & 300161 & 0.527 & 0.914 & 0.686 & 0.756 \\
+1.5 & 674113 & 1.181 & 0.922 & 0.722 & 0.780 \\
+2.0 & 1197313 & 2.095 & 0.922 & 0.666 & 0.807 \\
+3.0 & 2691457 & 4.704 & \textbf{0.924} & 0.677 & \textbf{0.817} \\
+4.0 & 4782593 & 8.353 & 0.923 & \textbf{0.724} & 0.795 \\
+\bottomrule
+\end{tabular}
+\normalsize
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Scaling discreto EfficientNet. Le varianti sono inizializzate da pesi ImageNet ufficiali. BA = balanced accuracy.}
+\small
+\begin{tabular}{lrrrrr}
+\toprule
+Variante & Parametri & GMAC & RSNA BA & Kermany BA & Chittagong BA \\
+\midrule
+B0 & 4008829 & 0.385 & \textbf{0.950} & \textbf{0.818} & 0.795 \\
+B1 & 6514465 & 0.568 & 0.946 & 0.733 & 0.674 \\
+B2 & 7702403 & 0.658 & 0.947 & 0.780 & \textbf{0.805} \\
+B3 & 10697769 & 0.961 & 0.936 & 0.805 & 0.750 \\
+\bottomrule
+\end{tabular}
+\normalsize
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\linewidth]{outputs/scaling_study/balanced_accuracy_vs_params.png}
+\caption{Studio di scaling: \balacc{} rispetto al numero di parametri, con asse x logaritmico. La stella indica PneumoniaNet \(w=1.0\); le croci indicano il ginocchio di saturazione stimato.}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\linewidth]{outputs/scaling_study/balanced_accuracy_vs_gmac.png}
+\caption{Studio di scaling: \balacc{} rispetto al costo computazionale in GMAC.}
+\end{figure}
+
+I risultati mostrano una saturazione netta della rete custom. Su RSNA, passare
+da 75457 parametri a 4.78 milioni di parametri cambia la \balacc{} solo da
+0.922 a 0.923, con massimo osservato 0.924 a \(w=3.0\). Quindi, nel subset
+attuale, la capacita' aggiuntiva di PneumoniaNet non si traduce in un guadagno
+interno proporzionale. Il punto \(w=1.0\), cioe' la rete originale, non e' il
+massimo della curva ma e' gia' vicino alla saturazione; il risultato piu'
+importante e' che l'aumento di larghezza non colma il divario con
+EfficientNet-B0 su RSNA.
+
+La curva EfficientNet conferma che architettura e pretraining contano piu' del
+solo numero di parametri. EfficientNet-B0 ottiene la migliore \balacc{} su RSNA
+(0.950) e Kermany (0.818) pur essendo la variante EfficientNet piu' piccola e
+meno costosa. B1, B2 e B3 aumentano parametri e GMAC, ma non migliorano in modo
+monotono la \balacc{}. Su Chittagong il miglior punto globale resta
+PneumoniaNet \(w=3.0\), ma il vantaggio e' piccolo rispetto a EfficientNet-B2
+(0.817 contro 0.805) e arriva con un costo computazionale molto piu' alto
+(4.704 GMAC contro 0.658 GMAC).
+
+Operativamente, questo studio suggerisce che il limite principale non e'
+semplicemente la capacita' grezza del modello. Con il subset RSNA corrente, la
+CNN custom satura presto; per migliorare servono architetture piu' efficienti,
+pretraining piu' informativo, piu' dati o un protocollo di addestramento diverso.
+La nuova opzione CLI \texttt{--train-size} permette di ripetere lo stesso studio
+con piu' immagini RSNA, proprio per distinguere saturazione dovuta alla
+capacita' da saturazione dovuta alla dimensione del training set.
+
 \section{Estensione multi-classe RSNA}
 
 Per rispondere all'ipotesi di aggiungere la terza classe esclusa finora, e'
@@ -615,6 +717,14 @@ mentre ResNet18 e' il modello che recupera piu' casi della terza classe.
 L'estensione e' quindi utile come osservazione metodologica sul transfer dal
 binario al multi-classe, non come benchmark definitivo del task multi-classe.
 
+\paragraph{8. Aumentare la capacita' non basta.}
+Lo studio di scaling controllato mostra che la CNN custom satura rapidamente:
+la curva PneumoniaNet resta intorno a 0.914--0.924 di \balacc{} su RSNA pur
+passando da 75457 a 4782593 parametri. EfficientNet-B0, invece, ottiene 0.950
+su RSNA e 0.818 su Kermany con soli 0.385 GMAC. Questo indica che il guadagno
+non dipende solo dalla capacita' grezza, ma anche dal disegno architetturale e
+dal pretraining.
+
 \section{Limitazioni}
 
 I risultati vanno letti tenendo presenti alcune limitazioni metodologiche.
@@ -633,6 +743,11 @@ I risultati vanno letti tenendo presenti alcune limitazioni metodologiche.
   \item \textbf{Subset RSNA bilanciato}: la scelta controlla il numero di esempi
   per classe e rende il confronto tra modelli pulito, ma non usa l'intera
   informazione disponibile in RSNA.
+  \item \textbf{Scaling controllato su una sola dimensione dati}: lo studio di
+  scaling usa il subset RSNA corrente come default. I modelli piu' grandi
+  potrebbero essere limitati anche dal numero di immagini disponibili, non solo
+  dalla propria capacita'. Per questo lo script espone \texttt{--train-size},
+  cosi' lo stesso protocollo puo' essere rilanciato con piu' esempi.
   \item \textbf{Delta crossover}: l'intervallo riportato sul delta medio tra
   training Kermany e training RSNA, entrambi valutati su Chittagong, e' calcolato
   sulle cinque architetture come unita' paired. Non e' un bootstrap sui singoli
@@ -708,6 +823,15 @@ non essendo mai il modello piu' accurato in assoluto. La scelta
 dell'architettura dipende quindi non solo dal dominio di test, ma anche dalla
 metrica di selezione: accuratezza, robustezza esterna o efficienza
 computazionale.
+
+Lo studio di scaling controllato rafforza questa lettura. La rete custom scala
+in modo regolare come numero di parametri e GMAC, ma la \balacc{} interna resta
+quasi piatta: il miglior punto PneumoniaNet e' \(w=3.0\) con 0.924 su RSNA,
+mentre \(w=1.0\) e' gia' a 0.914. EfficientNet-B0 raggiunge invece 0.950 su
+RSNA e 0.818 su Kermany con meno di 0.4 GMAC. Quindi, nel subset corrente,
+avvicinarsi alla top-performance richiede piu' della semplice larghezza della
+CNN custom: contano architettura, pretraining e rapporto tra capacita' e dati
+disponibili.
 
 L'estensione multi-classe con la terza classe RSNA esclusa finora e' stata
 avviata su tutte le architetture principali. Nel protocollo preliminare,
