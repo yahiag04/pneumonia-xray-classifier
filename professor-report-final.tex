@@ -438,6 +438,10 @@ il subset RSNA corrente, cioe' 2500 immagini normali e 2500 immagini con
 opacita' nel training set. Questa scelta rende il confronto direttamente
 comparabile con gli esperimenti principali.
 
+Nei grafici, il ginocchio di saturazione e' stimato come il primo punto in cui
+un incremento almeno doppio dei parametri produce meno di +0.01 di \balacc{}
+rispetto al miglior punto precedente con al massimo meta' dei parametri.
+
 Va distinta la confrontabilita' di protocollo dalla confrontabilita' di
 checkpoint. Lo script di scaling chiama il training loop per tutti i punti e non
 ricarica esplicitamente i checkpoint del benchmark principale. Tuttavia gli
@@ -447,11 +451,11 @@ stesso checkpoint: il benchmark seleziona il best checkpoint a epoca 5, mentre
 la run di scaling \(w=1.0\) seleziona il best checkpoint a epoca 16. Questo
 spiega la discrepanza numerica tra le due tabelle per la stessa architettura:
 0.896 contro 0.914 su RSNA e 0.830 contro 0.756 su Chittagong. Per
-EfficientNet-B0, invece, la riesecuzione con lo stesso seed ha riprodotto
-bitwise lo stesso \texttt{model\_state} del benchmark principale, quindi le
-metriche coincidono. Questa asimmetria e' un esito empirico degli artefatti, non
-una differenza intenzionale di protocollo. I valori assoluti delle due tabelle
-non devono quindi essere usati come se tutti i punti fossero la stessa identica
+EfficientNet-B0, invece, la riesecuzione con lo stesso seed seleziona lo stesso
+best checkpoint del benchmark principale, con metriche identiche alle cifre
+riportate. Questa asimmetria e' un esito empirico degli artefatti, non una
+differenza intenzionale di protocollo. I valori assoluti delle due tabelle non
+devono quindi essere usati come se tutti i punti fossero la stessa identica
 esecuzione; la tabella di scaling serve soprattutto a leggere l'andamento
 interno delle curve nello stesso protocollo.
 
