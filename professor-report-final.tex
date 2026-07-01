@@ -135,7 +135,9 @@ multi-classe a tre classi, mantenendo la classe precedentemente esclusa:
 Lo split multi-classe e' bilanciato a livello di classe: 2500 immagini per
 classe in training, 500 per classe in validation e 500 per classe in test. Il
 test multi-classe contiene quindi 1500 immagini totali, equamente divise tra le
-tre categorie.
+tre categorie. Questa tabella descrive lo split disponibile; l'esperimento
+multi-classe riportato piu' avanti non usa ancora il training set come
+fine-tuning end-to-end completo, ma come linear probe sui checkpoint binari.
 
 \subsection{Dataset esterni}
 
@@ -316,13 +318,9 @@ dataset e che le conclusioni non possono basarsi su un singolo test.
 La stessa conclusione emerge confrontando, sullo stesso dataset Chittagong, le
 reti addestrate nella fase iniziale su Kermany con le stesse architetture
 addestrate successivamente su RSNA. Il passaggio a RSNA migliora la \balacc{}
-media da circa 0.636 a circa 0.801, con un incremento medio di circa 0.165.
-Un bootstrap paired sui cinque modelli, usati come unita' di confronto, stima
-per questo delta medio un intervallo 95\% circa [0.123, 0.199]. Questo intervallo
-non va interpretato come bootstrap sui singoli pazienti, perche' per la fase
-Kermany-trained sono disponibili metriche aggregate e non predizioni campione per
-campione; resta pero' una misura della stabilita' del miglioramento tra
-architetture.
+media da circa 0.636 a circa 0.801, con un incremento medio di circa 0.165. Con
+solo cinque architetture, questo confronto va letto come descrittivo: i delta
+vanno da +0.082 a +0.211 e non costituiscono un intervallo inferenziale robusto.
 
 \begin{table}[H]
 \centering
@@ -331,11 +329,11 @@ architetture.
 \toprule
 Modello & Kermany$\rightarrow$Chittagong BA & RSNA$\rightarrow$Chittagong BA & Delta \\
 \midrule
-PneumoniaNet & 0.634 & 0.830 & +0.197 \\
-ResNet18 & 0.608 & 0.819 & +0.210 \\
+PneumoniaNet & 0.634 & 0.830 & +0.196 \\
+ResNet18 & 0.608 & 0.819 & +0.211 \\
 MobileNetV3 & 0.618 & 0.797 & +0.179 \\
 EfficientNet-B0 & 0.636 & 0.795 & +0.159 \\
-DenseNet121 & 0.682 & 0.764 & +0.081 \\
+DenseNet121 & 0.682 & 0.764 & +0.082 \\
 \midrule
 Media & 0.636 & 0.801 & +0.165 \\
 \bottomrule
@@ -393,7 +391,7 @@ Modello & RSNA BA/GMAC & Kermany BA/GMAC & Chittagong BA/GMAC \\
 \midrule
 PneumoniaNet & 1.70 & 1.30 & 1.57 \\
 ResNet18 & 0.52 & 0.40 & 0.45 \\
-MobileNetV3-Large & 4.38 & 3.66 & 3.70 \\
+MobileNetV3-Large & 4.39 & 3.66 & 3.70 \\
 EfficientNet-B0 & 2.47 & 2.13 & 2.07 \\
 DenseNet121 & 0.33 & 0.30 & 0.27 \\
 \bottomrule
@@ -446,11 +444,14 @@ Infatti il benchmark principale seleziona il best checkpoint a epoca 5, mentre
 la run di scaling \(w=1.0\) seleziona il best checkpoint a epoca 16. Questo
 spiega la discrepanza numerica tra la tabella benchmark e la tabella di scaling
 per la stessa architettura: 0.896 contro 0.914 su RSNA e 0.830 contro 0.756 su
-Chittagong. I valori assoluti delle due tabelle non devono quindi essere usati
-come se fossero la stessa identica esecuzione; il seed controllato rende il
-protocollo riproducibile, ma non garantisce una traiettoria bitwise identica su
-backend stocastici. La tabella di scaling serve soprattutto a leggere
-l'andamento interno delle curve addestrate nello stesso esperimento.
+Chittagong. Per EfficientNet-B0, invece, la ripetizione con lo stesso seed ha
+prodotto lo stesso \texttt{model\_state} del benchmark principale, quindi le
+metriche coincidono. I valori assoluti delle due tabelle non devono quindi
+essere usati come se tutti i punti fossero la stessa identica esecuzione; il
+seed controllato rende il protocollo riproducibile, ma non garantisce la stessa
+traiettoria per ogni architettura e backend. La tabella di scaling serve
+soprattutto a leggere l'andamento interno delle curve addestrate o riprodotte
+nello stesso protocollo.
 
 \begin{table}[H]
 \centering
@@ -505,7 +506,8 @@ Il risultato piu' pulito riguarda RSNA interno. Per PneumoniaNet, passare da
 0.923, con massimo osservato 0.924 a \(w=3.0\). Anche nella famiglia
 EfficientNet la curva non migliora con la dimensione: B0 ottiene 0.950, B1
 0.946, B2 0.947 e B3 0.936. La performance interna satura quindi ben prima del
-limite di capacita' esplorato.
+limite di capacita' esplorato, ma l'andamento va letto come piatto entro la
+variabilita' del training piu' che come plateau monotono.
 
 Sui dataset esterni, invece, le curve non sono monotone. PneumoniaNet oscilla da
 0.666 a 0.724 su Kermany e da 0.756 a 0.817 su Chittagong. EfficientNet mostra
@@ -513,8 +515,8 @@ lo stesso problema: su Chittagong B1 scende a 0.674, mentre B0 e B2 sono vicine
 a 0.80. Queste oscillazioni sono della stessa grandezza, o piu' grandi,
 dell'effetto atteso della capacita'. Con un solo seed non e' quindi possibile
 separare in modo affidabile l'effetto della complessita' dal rumore del training
-sulla generalizzazione esterna. Lo studio dimostra una saturazione interna
-netta, ma non consente una conclusione forte sullo scaling esterno.
+sulla generalizzazione esterna. Lo studio mostra una curva interna quasi piatta,
+ma non consente una conclusione forte sullo scaling esterno.
 
 Operativamente, il prossimo passo non e' soltanto aumentare la capacita', ma
 misurare la variabilita'. Lo stesso script permette di rilanciare lo studio con
@@ -672,12 +674,12 @@ label e protocolli di acquisizione \cite{cohen2020limits}. I risultati ottenuti
 seguono questa linea: le prestazioni interne RSNA sono alte per tutti i modelli
 principali, ma il ranking cambia su Kermany e Chittagong.
 
-Un meccanismo plausibile riguarda anche la proiezione AP/PA: il subset RSNA e'
-quasi bilanciato tra PA e AP, mentre Kermany e' sostanzialmente dominato da
-proiezioni AP pediatriche. RSNA puo' quindi coprire una porzione piu' ampia
-della variabilita' di acquisizione, incluso il regime AP che rende meno brusco
-il trasferimento verso Kermany; al contrario, un training quasi solo AP puo'
-non coprire adeguatamente dataset adulti con maggiore presenza PA.
+La proiezione AP/PA resta un confondente possibile, non una spiegazione causale
+dimostrata. Il subset RSNA e' quasi bilanciato tra PA e AP, mentre i manifest
+esterni non permettono lo stesso controllo sistematico. Poiche' Kermany resta il
+test esterno piu' difficile nonostante la presenza attesa di molte proiezioni AP
+pediatriche, la view position va trattata come ipotesi da controllare, non come
+meccanismo sufficiente a spiegare il trasferimento.
 
 \paragraph{3. La migliore rete dipende dal dataset.}
 EfficientNet-B0 e' la scelta piu' forte su RSNA interno, DenseNet121 e' la piu'
@@ -686,16 +688,17 @@ modelli. Questo rende la tesi piu' solida: invece di forzare una conclusione
 assoluta, si dimostra che la scelta dell'architettura va valutata insieme al
 dominio di test.
 
-\paragraph{4. Il ribaltamento di DenseNet121 e' un effetto di calibrazione.}
+\paragraph{4. Il ribaltamento di DenseNet121 e' un effetto di soglia.}
 DenseNet121 e' il modello migliore su Kermany e ha la \balacc{} piu' bassa su
-Chittagong, ma la sua ROC-AUC su Chittagong resta competitiva (0.844): il potere
-discriminativo non crolla. Lo split sensitivity/specificity in
-Tabella~\ref{tab:benchmark-post-training} mostra
-uno spostamento sistematico del punto operativo a soglia 0.5 verso la
-specificity al crescere della capacita' del modello: si passa da sensitivity
-0.875 e specificity 0.786 per PneumoniaNet a sensitivity 0.602 e specificity
-0.926 per DenseNet121. Il ribaltamento in \balacc{} riflette quindi soprattutto
-la posizione della soglia nel dominio Chittagong, non necessariamente un
+Chittagong, ma la sua ROC-AUC su Chittagong resta discreta (0.844), pur essendo
+significativamente inferiore a quella di PneumoniaNet. Lo split
+sensitivity/specificity in Tabella~\ref{tab:benchmark-post-training} mostra che
+i due punti operativi estremi differiscono nettamente: PneumoniaNet privilegia
+la sensitivity (0.875/0.786), mentre DenseNet121 privilegia la specificity
+(0.602/0.926). Non emerge pero' un trend monotono attribuibile alla capacita',
+perche' ResNet18 e' il modello piu' grande ma mantiene una sensitivity alta su
+Chittagong. Il ribaltamento in \balacc{} riflette quindi soprattutto la
+posizione della soglia nel dominio Chittagong, non necessariamente un
 peggioramento delle feature apprese. Questo e' coerente con Cohen et al.
 \cite{cohen2020limits} e si collega direttamente alla limitazione sulla soglia
 fissa: a soglia 0.5, modelli con AUC comparabile possono mostrare \balacc{}
@@ -728,11 +731,12 @@ mentre ResNet18 e' il modello che recupera piu' casi della terza classe.
 L'estensione e' quindi utile come osservazione metodologica sul transfer dal
 binario al multi-classe, non come benchmark definitivo del task multi-classe.
 
-\paragraph{8. Lo scaling separa saturazione interna e rumore esterno.}
-Lo studio di scaling controllato mostra una saturazione interna chiara: su RSNA
-PneumoniaNet resta tra 0.914 e 0.924 di \balacc{} pur passando da 75457 a
-4782593 parametri, mentre EfficientNet-B0 e' gia' il punto migliore della propria
-famiglia. Sui dataset esterni, pero', le curve oscillano senza trend monotono.
+\paragraph{8. Lo scaling separa curva interna piatta e rumore esterno.}
+Lo studio di scaling controllato mostra che su RSNA PneumoniaNet resta tra 0.914
+e 0.924 di \balacc{} pur passando da 75457 a 4782593 parametri, mentre
+EfficientNet-B0 e' gia' il punto migliore della propria famiglia. Questa curva
+interna e' piatta entro la variabilita' del training, non un plateau monotono
+pulito. Sui dataset esterni, inoltre, le curve oscillano senza trend monotono.
 Questo rende il singolo seed una limitazione centrale: per la generalizzazione
 esterna il rumore della run sembra comparabile all'effetto della capacita'.
 
@@ -755,6 +759,11 @@ I risultati vanno letti tenendo presenti alcune limitazioni metodologiche.
   valutazioni esterne le oscillazioni tra punti della curva sono paragonabili
   all'effetto della capacita', quindi non vanno lette come trend architetturali
   definitivi.
+  \item \textbf{Budget effettivo di training}: il benchmark principale seleziona
+  PneumoniaNet a epoca 5, mentre la run di scaling \(w=1.0\) arriva al best
+  checkpoint a epoca 16 e ottiene una \balacc{} RSNA piu' alta. Il divario RSNA
+  tra EfficientNet-B0 e PneumoniaNet puo' quindi riflettere in parte anche la
+  variabilita' del training e dell'early stopping, non solo l'architettura.
   \item \textbf{Subset RSNA bilanciato}: la scelta controlla il numero di esempi
   per classe e rende il confronto tra modelli pulito, ma non usa l'intera
   informazione disponibile in RSNA.
@@ -763,9 +772,9 @@ I risultati vanno letti tenendo presenti alcune limitazioni metodologiche.
   potrebbero essere limitati anche dal numero di immagini disponibili, non solo
   dalla propria capacita'. Per questo lo script espone \texttt{--train-size},
   cosi' lo stesso protocollo puo' essere rilanciato con piu' esempi e piu' seed.
-  \item \textbf{Delta crossover}: l'intervallo riportato sul delta medio tra
-  training Kermany e training RSNA, entrambi valutati su Chittagong, e' calcolato
-  sulle cinque architetture come unita' paired. Non e' un bootstrap sui singoli
+  \item \textbf{Delta crossover}: il range riportato per il miglioramento da
+  training Kermany a training RSNA e' descrittivo e usa solo cinque architetture
+  come unita' di confronto. Non e' un intervallo inferenziale sui singoli
   pazienti, perche' per la fase Kermany-trained sono disponibili metriche
   aggregate e non tutte le predizioni campione per campione.
   \item \textbf{Esperimento multi-classe preliminare}: l'estensione a tre classi
@@ -841,12 +850,12 @@ computazionale.
 
 Lo studio di scaling controllato rafforza questa lettura, ma in modo piu'
 metodologico che prescrittivo. Su RSNA interno la \balacc{} e' quasi piatta
-rispetto alla capacita' per entrambe le famiglie: la performance satura prima
-del limite esplorato. Sui dataset esterni, invece, le curve non sono monotone e
-oscillano in un intervallo comparabile all'effetto atteso della capacita'. Con
-un solo seed, quindi, lo studio non dimostra una legge di scaling esterna:
-mostra che serve controllare la variabilita' prima di attribuire i cambiamenti
-di generalizzazione alla complessita' del modello.
+rispetto alla capacita' per entrambe le famiglie, entro la variabilita' osservata
+tra run. Sui dataset esterni, invece, le curve non sono monotone e oscillano in
+un intervallo comparabile all'effetto atteso della capacita'. Con un solo seed,
+quindi, lo studio non dimostra una legge di scaling esterna: mostra che serve
+controllare la variabilita' prima di attribuire i cambiamenti di generalizzazione
+alla complessita' del modello.
 
 L'estensione multi-classe con la terza classe RSNA esclusa finora e' stata
 avviata su tutte le architetture principali. Nel protocollo preliminare,
