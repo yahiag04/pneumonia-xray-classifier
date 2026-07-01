@@ -437,21 +437,21 @@ opacita' nel training set. Questa scelta rende il confronto direttamente
 comparabile con gli esperimenti principali.
 
 Va distinta la confrontabilita' di protocollo dalla confrontabilita' di
-checkpoint. Il punto PneumoniaNet \(w=1.0\) ha la stessa architettura della
-PneumoniaNet del benchmark principale, ma e' una nuova run di training dello
-studio di scaling, non lo stesso checkpoint riportato nella tabella benchmark.
-Infatti il benchmark principale seleziona il best checkpoint a epoca 5, mentre
+checkpoint. Lo script di scaling chiama il training loop per tutti i punti e non
+ricarica esplicitamente i checkpoint del benchmark principale. Tuttavia gli
+artefatti prodotti mostrano due casi diversi. Il punto PneumoniaNet \(w=1.0\)
+ha la stessa architettura della PneumoniaNet del benchmark principale, ma non lo
+stesso checkpoint: il benchmark seleziona il best checkpoint a epoca 5, mentre
 la run di scaling \(w=1.0\) seleziona il best checkpoint a epoca 16. Questo
-spiega la discrepanza numerica tra la tabella benchmark e la tabella di scaling
-per la stessa architettura: 0.896 contro 0.914 su RSNA e 0.830 contro 0.756 su
-Chittagong. Per EfficientNet-B0, invece, la ripetizione con lo stesso seed ha
-prodotto lo stesso \texttt{model\_state} del benchmark principale, quindi le
-metriche coincidono. I valori assoluti delle due tabelle non devono quindi
-essere usati come se tutti i punti fossero la stessa identica esecuzione; il
-seed controllato rende il protocollo riproducibile, ma non garantisce la stessa
-traiettoria per ogni architettura e backend. La tabella di scaling serve
-soprattutto a leggere l'andamento interno delle curve addestrate o riprodotte
-nello stesso protocollo.
+spiega la discrepanza numerica tra le due tabelle per la stessa architettura:
+0.896 contro 0.914 su RSNA e 0.830 contro 0.756 su Chittagong. Per
+EfficientNet-B0, invece, la riesecuzione con lo stesso seed ha riprodotto
+bitwise lo stesso \texttt{model\_state} del benchmark principale, quindi le
+metriche coincidono. Questa asimmetria e' un esito empirico degli artefatti, non
+una differenza intenzionale di protocollo. I valori assoluti delle due tabelle
+non devono quindi essere usati come se tutti i punti fossero la stessa identica
+esecuzione; la tabella di scaling serve soprattutto a leggere l'andamento
+interno delle curve nello stesso protocollo.
 
 \begin{table}[H]
 \centering
