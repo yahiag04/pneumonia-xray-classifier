@@ -27,6 +27,9 @@ class ModelRegistryTest(unittest.TestCase):
         self.assertIn("resnet50", names)
         self.assertIn("densenet121", names)
         self.assertIn("efficientnet_b0", names)
+        self.assertIn("efficientnet_b1", names)
+        self.assertIn("efficientnet_b2", names)
+        self.assertIn("efficientnet_b3", names)
         self.assertIn("mobilenet_v3_large", names)
 
     def test_pneumonia_net_outputs_single_logit(self):
@@ -37,6 +40,20 @@ class ModelRegistryTest(unittest.TestCase):
             out = model(torch.zeros(2, 1, 224, 224))
 
         self.assertEqual(tuple(out.shape), (2, 1))
+
+    def test_pneumonia_net_width_one_preserves_baseline_parameter_count(self):
+        model = build_model("pneumonia_net", pretrained=False, width=1.0)
+
+        self.assertEqual(sum(parameter.numel() for parameter in model.parameters()), 300161)
+
+    def test_pneumonia_net_width_scales_channels_and_head(self):
+        model = build_model("pneumonia_net", pretrained=False, width=0.5)
+
+        self.assertEqual(model.conv1.out_channels, 8)
+        self.assertEqual(model.conv2a.out_channels, 16)
+        self.assertEqual(model.conv3a.out_channels, 32)
+        self.assertEqual(model.conv4a.out_channels, 64)
+        self.assertEqual(model.fc1.out_features, 32)
 
     def test_pneumonia_net_can_output_three_multiclass_logits(self):
         model = build_model("pneumonia_net", pretrained=False, num_classes=3)

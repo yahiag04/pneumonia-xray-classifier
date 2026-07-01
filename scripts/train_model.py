@@ -24,6 +24,13 @@ def main():
     parser.add_argument("--patience", type=int, default=5)
     parser.add_argument("--image-size", type=int, default=224)
     parser.add_argument("--val-fraction", type=float, default=0.1)
+    parser.add_argument("--model-width", type=float, default=1.0)
+    parser.add_argument(
+        "--train-size",
+        type=int,
+        default=None,
+        help="Optional balanced training subset size. Default uses the full current train split.",
+    )
     parser.add_argument("--num-workers", type=int, default=0)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--device", default=None)
@@ -47,6 +54,8 @@ def main():
         val_fraction=args.val_fraction,
         pretrained=not args.no_pretrained,
         freeze_backbone=args.freeze_backbone,
+        model_width=args.model_width,
+        train_size=args.train_size,
         num_workers=args.num_workers,
         seed=args.seed,
         device=args.device,

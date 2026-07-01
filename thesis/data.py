@@ -179,6 +179,7 @@ def build_internal_splits(
     image_size: int = 224,
     val_fraction: float = 0.1,
     seed: int = 42,
+    train_size: int | None = None,
 ) -> DatasetSplits:
     data_root = Path(data_root)
     train_dir = data_root / "train"
@@ -200,6 +201,9 @@ def build_internal_splits(
         train_indices, val_indices = _split_indices(len(train_full), val_fraction, seed)
         train_ds = Subset(train_full, train_indices)
         val_ds = Subset(val_full, val_indices)
+
+    if train_size is not None:
+        train_ds = make_balanced_subset(train_ds, size=train_size, seed=seed)
 
     test_ds = BinaryImageDataset(test_dir, transform=eval_tf) if test_dir.is_dir() else None
     return DatasetSplits(train=train_ds, val=val_ds, test=test_ds)
@@ -256,3 +260,44 @@ def _split_indices(length: int, val_fraction: float, seed: int):
     if not train_indices:
         train_indices, val_indices = indices[:-1], indices[-1:]
     return train_indices, val_indices
+
+
+def make_balanced_subset(dataset: Dataset, size: int, seed: int = 42) -> Subset:
+    if size <= 0:
+        raise ValueError("size must be positive")
+    if size > len(dataset):
+        raise ValueError(f"Requested {size} samples, but dataset has {len(dataset)}")
+
+    by_label: dict[int, list[int]] = {}
+    for index in range(len(dataset)):
+        label = _label_at(dataset, index)
+        by_label.setdefault(label, []).append(index)
+    if len(by_label) < 2:
+        raise ValueError("Need at least two classes for a balanced subset")
+
+    labels = sorted(by_label)
+    base_count = size // len(labels)
+    remainder = size % len(labels)
+    rng = random.Random(seed)
+    selected = []
+    for offset, label in enumerate(labels):
+        required = base_count + (1 if offset < remainder else 0)
+        candidates = list(by_label[label])
+        if len(candidates) < required:
+            raise ValueError(
+                f"Need {required} samples for label {label}, found {len(candidates)}"
+            )
+        rng.shuffle(candidates)
+        selected.extend(candidates[:required])
+    rng.shuffle(selected)
+    return Subset(dataset, selected)
+
+
+def _label_at(dataset: Dataset, index: int) -> int:
+    if isinstance(dataset, Subset):
+        return _label_at(dataset.dataset, dataset.indices[index])
+    samples = getattr(dataset, "samples", None)
+    if samples is not None:
+        return int(samples[index][1])
+    _, label = dataset[index]
+    return int(label)

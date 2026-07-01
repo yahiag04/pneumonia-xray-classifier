@@ -11,6 +11,9 @@ _MODEL_NAMES = (
     "resnet50",
     "densenet121",
     "efficientnet_b0",
+    "efficientnet_b1",
+    "efficientnet_b2",
+    "efficientnet_b3",
     "mobilenet_v3_large",
 )
 
@@ -19,10 +22,15 @@ def available_models() -> tuple[str, ...]:
     return _MODEL_NAMES
 
 
-def build_model(name: str, pretrained: bool = True, num_classes: int = 1) -> nn.Module:
+def build_model(
+    name: str,
+    pretrained: bool = True,
+    num_classes: int = 1,
+    width: float = 1.0,
+) -> nn.Module:
     name = name.lower()
     if name == "pneumonia_net":
-        return PneumoniaNet(num_classes=num_classes)
+        return PneumoniaNet(num_classes=num_classes, width=width)
 
     models = _torchvision_models()
     if name == "resnet18":
@@ -40,6 +48,24 @@ def build_model(name: str, pretrained: bool = True, num_classes: int = 1) -> nn.
     if name == "efficientnet_b0":
         model = models.efficientnet_b0(
             weights=models.EfficientNet_B0_Weights.DEFAULT if pretrained else None
+        )
+        model.classifier[-1] = nn.Linear(model.classifier[-1].in_features, num_classes)
+        return model
+    if name == "efficientnet_b1":
+        model = models.efficientnet_b1(
+            weights=models.EfficientNet_B1_Weights.DEFAULT if pretrained else None
+        )
+        model.classifier[-1] = nn.Linear(model.classifier[-1].in_features, num_classes)
+        return model
+    if name == "efficientnet_b2":
+        model = models.efficientnet_b2(
+            weights=models.EfficientNet_B2_Weights.DEFAULT if pretrained else None
+        )
+        model.classifier[-1] = nn.Linear(model.classifier[-1].in_features, num_classes)
+        return model
+    if name == "efficientnet_b3":
+        model = models.efficientnet_b3(
+            weights=models.EfficientNet_B3_Weights.DEFAULT if pretrained else None
         )
         model.classifier[-1] = nn.Linear(model.classifier[-1].in_features, num_classes)
         return model
@@ -78,7 +104,13 @@ def configure_trainable_layers(model: nn.Module, model_name: str, mode: str) -> 
             _unfreeze_module(model.features.denseblock4)
             _unfreeze_module(model.features.norm5)
         _unfreeze_module(model.classifier)
-    elif model_name in {"efficientnet_b0", "mobilenet_v3_large"}:
+    elif model_name in {
+        "efficientnet_b0",
+        "efficientnet_b1",
+        "efficientnet_b2",
+        "efficientnet_b3",
+        "mobilenet_v3_large",
+    }:
         if mode == "last_block":
             _unfreeze_module(model.features[-1])
         _unfreeze_module(model.classifier)

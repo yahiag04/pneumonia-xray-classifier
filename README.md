@@ -78,6 +78,12 @@ Train all adult-branch models and evaluate external manifests:
 python scripts/run_adult_branch.py --help
 ```
 
+Run the controlled capacity scaling study:
+
+```bash
+python scripts/run_scaling_study.py --help
+```
+
 Train or evaluate one model on the 3-class RSNA task:
 
 ```bash

@@ -1,10 +1,14 @@
 import unittest
+import tempfile
+from pathlib import Path
 
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
+from PIL import Image
 
-from thesis.train import collect_predictions, keep_frozen_modules_eval
+from thesis.model_registry import build_model
+from thesis.train import collect_predictions, evaluate_checkpoint, keep_frozen_modules_eval
 
 
 class IdentityLogitModel(nn.Module):
@@ -53,6 +57,39 @@ class FrozenModuleTrainingTest(unittest.TestCase):
         self.assertFalse(model[0].training)
         self.assertTrue(model[1].training)
         self.assertTrue(torch.equal(model[0].running_mean, before))
+
+
+class CheckpointMetadataTest(unittest.TestCase):
+    def test_evaluate_checkpoint_rebuilds_pneumonia_net_with_saved_width(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            test_root = root / "images"
+            rows = ["path,label"]
+            for label in ["normal", "pneumonia"]:
+                label_dir = test_root / label
+                label_dir.mkdir(parents=True)
+                image_path = label_dir / f"{label}.png"
+                Image.new("L", (32, 32), color=128).save(image_path)
+                rows.append(f"{image_path},{label}")
+            manifest = root / "manifest.csv"
+            manifest.write_text("\n".join(rows) + "\n")
+            checkpoint = root / "best.pt"
+            model = build_model("pneumonia_net", pretrained=False, width=0.5)
+            torch.save(
+                {
+                    "model_state": model.state_dict(),
+                    "model_name": "pneumonia_net",
+                    "model_width": 0.5,
+                    "image_size": 32,
+                    "threshold": 0.5,
+                },
+                checkpoint,
+            )
+
+            result = evaluate_checkpoint(checkpoint, manifest_csv=manifest, device="cpu")
+
+        self.assertEqual(result["num_samples"], 2)
+        self.assertEqual(result["model_name"], "pneumonia_net")
 
 
 if __name__ == "__main__":

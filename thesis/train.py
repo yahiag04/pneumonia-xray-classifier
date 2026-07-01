@@ -19,6 +19,7 @@ class TrainConfig:
     data_root: Path
     model_name: str
     output_dir: Path
+    run_name: str | None = None
     epochs: int = 20
     batch_size: int = 32
     lr: float = 3e-4
@@ -27,6 +28,8 @@ class TrainConfig:
     val_fraction: float = 0.1
     pretrained: bool = True
     freeze_backbone: bool = False
+    model_width: float = 1.0
+    train_size: int | None = None
     num_workers: int = 0
     seed: int = 42
     device: str | None = None
@@ -45,7 +48,7 @@ def choose_device(device: str | None = None) -> torch.device:
 def train_model(config: TrainConfig) -> dict:
     torch.manual_seed(config.seed)
     device = choose_device(config.device)
-    run_dir = config.output_dir / config.model_name
+    run_dir = config.output_dir / (config.run_name or config.model_name)
     run_dir.mkdir(parents=True, exist_ok=True)
 
     splits = build_internal_splits(
@@ -54,6 +57,7 @@ def train_model(config: TrainConfig) -> dict:
         image_size=config.image_size,
         val_fraction=config.val_fraction,
         seed=config.seed,
+        train_size=config.train_size,
     )
     train_loader = DataLoader(
         splits.train,
@@ -68,7 +72,11 @@ def train_model(config: TrainConfig) -> dict:
         num_workers=config.num_workers,
     )
 
-    model = build_model(config.model_name, pretrained=config.pretrained).to(device)
+    model = build_model(
+        config.model_name,
+        pretrained=config.pretrained,
+        width=config.model_width,
+    ).to(device)
     if config.freeze_backbone:
         model = freeze_backbone(model, config.model_name)
     criterion = nn.BCEWithLogitsLoss()
@@ -100,6 +108,7 @@ def train_model(config: TrainConfig) -> dict:
                     "pretrained": config.pretrained,
                     "freeze_backbone": config.freeze_backbone,
                     "image_size": config.image_size,
+                    "model_width": config.model_width,
                     "threshold": 0.5,
                     "config": _jsonable_config(config),
                 },
@@ -149,10 +158,11 @@ def evaluate_checkpoint(
     state_dict = checkpoint_meta.get("model_state", checkpoint)
     model_name = model_name or checkpoint_meta.get("model_name", "pneumonia_net")
     image_size = int(checkpoint_meta.get("image_size", 224))
+    model_width = float(checkpoint_meta.get("model_width", 1.0))
     threshold = float(threshold if threshold is not None else checkpoint_meta.get("threshold", 0.5))
     torch_device = choose_device(device)
 
-    model = build_model(model_name, pretrained=False)
+    model = build_model(model_name, pretrained=False, width=model_width)
     model.load_state_dict(state_dict)
     model.to(torch_device)
     model.eval()
